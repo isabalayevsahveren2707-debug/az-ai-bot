@@ -5,46 +5,53 @@ import google.generativeai as genai
 st.set_page_config(page_title="Az AI Pro", page_icon="🤖")
 st.title("🤖 Az AI Pro")
 
-# API Key yoxlanışı (Streamlit Secrets-dən götürülür)
+# API Key yoxlanışı
 if "GOOGLE_API_KEY" not in st.secrets:
     st.error("Lütfən Secrets hissəsinə GOOGLE_API_KEY əlavə edin!")
 else:
-    # Google Gemini konfiqurasiyası
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
     
-    # Ən yeni və stabil model (Flash modeli həm daha sürətlidir, həm də xətasızdır)
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    # Model seçimi - Google bəzən 'models/' prefiksi tələb edir
+    # Ən stabil 1.5 Flash modelini yoxlayırıq
+    try:
+        model = genai.GenerativeModel('gemini-1.5-flash')
+    except:
+        model = genai.GenerativeModel('models/gemini-1.5-flash')
 
-    # Mesaj tarixçəsini yaddaşda saxla
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
-    # Köhnə mesajları ekranda göstər
+    # Mesaj tarixçəsini göstər
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
     # İstifadəçidən sual al
     if prompt := st.chat_input("Sualınızı bura yazın..."):
-        # İstifadəçinin mesajını əlavə et
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)
 
-        # Süni intellektin cavabını hazırla
         with st.chat_message("assistant"):
             try:
-                # Cavabın yaradılması
+                # Cavabı almağa çalışırıq
                 response = model.generate_content(prompt)
                 
+                # Cavabı ekrana çıxarırıq
                 if response.text:
-                    full_response = response.text
+                    bot_message = response.text
                 else:
-                    full_response = "Təəssüf ki, cavab hazırlana bilmədi."
+                    bot_message = "Təəssüf ki, cavab boş qayıtdı."
                 
-                st.markdown(full_response)
-                # Cavabı tarixçəyə əlavə et
-                st.session_state.messages.append({"role": "assistant", "content": full_response})
-                
+                st.markdown(bot_message)
+                st.session_state.messages.append({"role": "assistant", "content": bot_message})
+            
             except Exception as e:
-                st.error(f"Sistem xətası baş verdi: {e}")
+                # Əgər yuxarıdakı model işləməsə, avtomatik köhnə modelə keçid edirik
+                try:
+                    alt_model = genai.GenerativeModel('gemini-pro')
+                    alt_response = alt_model.generate_content(prompt)
+                    st.markdown(alt_response.text)
+                    st.session_state.messages.append({"role": "assistant", "content": alt_response.text})
+                except Exception as e2:
+                    st.error(f"Xəta davam edir: {e2}")
